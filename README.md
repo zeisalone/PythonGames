@@ -1,3 +1,7 @@
 # PythonGames
 
-Random and fairly simple games in Python. So far only Connect4.
+Random and fairly simple games in Python.
+
+-> Connect4 
+
+-> TicTacToe
