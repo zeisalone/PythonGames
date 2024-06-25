@@ -2,5 +2,6 @@
 
 Random and fairly simple games in Python.
 
--> Connect4
+-> Connect4 
+
 -> TicTacToe
