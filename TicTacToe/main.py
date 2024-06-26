@@ -1,7 +1,7 @@
 import pygame
 import sys
 import time
-from random import randint
+from random import choice
 
 WINDOW_SIZE = 700
 SQUARE_SIZE = WINDOW_SIZE // 3
@@ -39,9 +39,9 @@ class MainMenu:
                 sys.exit()
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 if self.friend_button_rect.collidepoint(event.pos):
-                    self.game.start_loading()
+                    self.game.start_loading(friend_mode=True)
                 elif self.computer_button_rect.collidepoint(event.pos):
-                    print("Play against the Computer button clicked")
+                    self.game.start_loading(friend_mode=False)
 
     def run(self):
         self.draw()
@@ -61,8 +61,10 @@ class LoadingScreen:
         self.game.start_game()
 
 class TicTacToe:
-    def __init__(self, game):
+    def __init__(self, game, vs_computer=False, computer_first=False):
         self.game = game
+        self.vs_computer = vs_computer
+        self.computer_first = computer_first
         self.board = self.image_fetching('img/board.jpg', [WINDOW_SIZE]*2)
         self.O = self.image_fetching('img/O.png', [SQUARE_SIZE]*2)
         self.X = self.image_fetching('img/X.png', [SQUARE_SIZE]*2)
@@ -71,7 +73,7 @@ class TicTacToe:
                            [INF,INF,INF],
                            [INF,INF,INF]]
 
-        self.player = randint(0,1)
+        self.player = 0 if self.computer_first else 1
 
         self.possible_win_array = [[(0,0), (0,1), (0,2)],
                                    [(1,0), (1,1), (1,2)],
@@ -81,44 +83,73 @@ class TicTacToe:
                                    [(0,2), (1,2), (2,2)],
                                    [(0,0), (1,1), (2,2)],
                                    [(0,2), (1,1), (2,0)]]
-        
         self.winner = None
         self.game_steps = 0
         self.font = pygame.font.SysFont('Arial', SQUARE_SIZE // 4, True)
 
     def check_win(self):
-       for line_ind in self.possible_win_array:
-           sum_line = sum([self.game_array[i][j] for i,j in line_ind])
-           if sum_line in {0,3}:
-               self.winner = 'XO'[sum_line == 0]
-               self.winner_line = [vec2(line_ind[0][::-1])* SQUARE_SIZE + CELL_CENTER,
-                                   vec2(line_ind[2][::-1])* SQUARE_SIZE + CELL_CENTER]
+        for line_ind in self.possible_win_array:
+            sum_line = sum([self.game_array[i][j] for i, j in line_ind])
+            if sum_line in {0, 3}:
+                self.winner = 'XO'[sum_line == 0]
+                self.winner_line = [vec2(line_ind[0][::-1]) * SQUARE_SIZE + CELL_CENTER,
+                                    vec2(line_ind[2][::-1]) * SQUARE_SIZE + CELL_CENTER]
+
+    def computer_move(self):
+        def can_win(player):
+            for line in self.possible_win_array:
+                values = [self.game_array[i][j] for i, j in line]
+                if values.count(player) == 2 and values.count(INF) == 1:
+                    empty_cell = line[values.index(INF)]
+                    return empty_cell
+            return None
+        win_cell = can_win(0)
+        if win_cell:
+            self.game_array[win_cell[0]][win_cell[1]] = self.player
+        else:
+            block_cell = can_win(1)
+            if block_cell:
+                self.game_array[block_cell[0]][block_cell[1]] = self.player
+            else:
+                empty_cells = [(row, col) for row in range(3) for col in range(3) if self.game_array[row][col] == INF]
+                if empty_cells:
+                    row, col = choice(empty_cells)
+                    self.game_array[row][col] = self.player
+
+        self.player = not self.player
+        self.game_steps += 1
+        self.check_win()
 
     def run_game_process(self):
-        current_cell = vec2(pygame.mouse.get_pos()) // SQUARE_SIZE
-        col, row = map(int, current_cell)
-        left_click = pygame.mouse.get_pressed()[0]
+        if self.vs_computer and self.player == 0:
+            self.computer_move()
+        else:
+            current_cell = vec2(pygame.mouse.get_pos()) // SQUARE_SIZE
+            col, row = map(int, current_cell)
+            left_click = pygame.mouse.get_pressed()[0]
 
-        if left_click and self.game_array[row][col] == INF and not self.winner:
-            self.game_array[row][col] = self.player
-            self.player = not self.player
-            self.game_steps += 1
-            self.check_win()
+            if left_click and self.game_array[row][col] == INF and not self.winner:
+                self.game_array[row][col] = self.player
+                self.player = not self.player
+                self.game_steps += 1
+                self.check_win()
 
     def draw_objects(self):
         for y, row in enumerate(self.game_array):
             for x, obj in enumerate(row):
                 if obj != INF:
-                    self.game.screen.blit(self.X if obj else self.O, vec2(x,y) * SQUARE_SIZE)
+                    self.game.screen.blit(self.X if obj else self.O, vec2(x, y) * SQUARE_SIZE)
 
     def draw_winner(self):
         if self.winner:
             pygame.draw.line(self.game.screen, 'red', *self.winner_line, SQUARE_SIZE // 8)
             label = self.font.render(f'PLAYER "{self.winner}" WINS', True, 'white', 'black')
-            self.game.screen.blit(label, (WINDOW_SIZE // 2 - label.get_width() // 2, WINDOW_SIZE //  4))
-
+            self.game.screen.blit(label, (WINDOW_SIZE // 2 - label.get_width() // 2, WINDOW_SIZE // 4))
+        elif self.game_steps == 9:
+            label = self.font.render(f'You have tied!', True, 'white', 'black')
+            self.game.screen.blit(label, (WINDOW_SIZE // 2 - label.get_width() // 2, WINDOW_SIZE // 4))
     def draw(self):
-        self.game.screen.blit(self.board, (0,0))
+        self.game.screen.blit(self.board, (0, 0))
         self.draw_objects()
         self.draw_winner()
 
@@ -126,14 +157,14 @@ class TicTacToe:
     def image_fetching(path, res):
         img = pygame.image.load(path)
         return pygame.transform.smoothscale(img, res)
-    
+
     def caption(self):
         pygame.display.set_caption(f'Player "{"OX"[self.player]}" turn!')
         if self.winner:
-            pygame.display.set_caption(f'Player "{self.winner}" has won! Press Space for a rematch!')
+            pygame.display.set_caption(f'Player "{self.winner}" has won! Press Space for a rematch!' if self.winner == "X" else "You Lose! Press Space for a rematch!")
         elif self.game_steps == 9:
-             pygame.display.set_caption(f'TIE!!! Press Space to Restart')
-    
+            pygame.display.set_caption(f'TIE!!! Press Space to Restart')
+
     def run(self):
         self.caption()
         self.draw()
@@ -146,15 +177,19 @@ class StartUp:
         self.timer = pygame.time.Clock()
         self.main_menu = MainMenu(self)
         self.loading_screen = LoadingScreen(self)
-        self.tictactoe = TicTacToe(self)
+        self.tictactoe = None
         self.state = "menu"
+        self.computer_first = False
 
-    def start_loading(self):
+    def start_loading(self, friend_mode):
+        self.friend_mode = friend_mode
         self.state = "loading"
 
     def start_game(self):
-        self.tictactoe = TicTacToe(self)
+        self.tictactoe = TicTacToe(self, vs_computer=not self.friend_mode, computer_first=self.computer_first)
+        self.computer_first = not self.computer_first
         self.state = "game"
+
 
     def check(self):
         for event in pygame.event.get():
@@ -163,7 +198,7 @@ class StartUp:
                 sys.exit()
             if self.state == "game" and event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE:
-                    self.start_loading()
+                    self.start_loading(friend_mode=self.friend_mode)
 
     def start(self):
         while True:
